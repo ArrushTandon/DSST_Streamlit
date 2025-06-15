@@ -1,4 +1,3 @@
-
 # 🧠 DSST - Domain-Specific Speech Transcription Using Whisper
 
 This project implements **Domain-Specific Speech Transcription (DSST)** using OpenAI's Whisper model. It transcribes audio commands, extracts **robot movement instructions**, calculates **Character Error Rate (CER)**, and presents everything through a **Streamlit-powered web app**.
@@ -7,7 +6,7 @@ This project implements **Domain-Specific Speech Transcription (DSST)** using Op
 
 ## 🌐 Live App
 
-👉 [Launch DSST Web App](https://dsst-streamlit-yourusername.streamlit.app)
+👉 [Launch DSST Web App](https://dsstapp.streamlit.app/)
 
 ---
 
