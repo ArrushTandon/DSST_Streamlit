@@ -117,5 +117,3 @@ if uploaded_audio:
         st.json(commands)
     else:
         st.warning("⚠️ No movement intent detected.")
-
-    os.remove(tmp_path)
