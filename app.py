@@ -5,6 +5,7 @@ import Levenshtein
 import os
 import tempfile
 import re
+st.set_page_config(page_title="DSST Web App", layout="centered")
 
 @st.cache_resource
 def load_model():
@@ -60,8 +61,7 @@ def transcribe_audio(audio_path):
     return result.text.strip()
 
 # --- Streamlit UI ---
-st.set_page_config(page_title="DSST Web App", layout="centered")
-st.title("🧠 DSST - Domain-Specific Speech Transcription")
+st.title("DSST - Domain-Specific Speech Transcription")
 
 uploaded_audio = st.file_uploader("🎤 Upload an audio file", type=["wav", "mp3", "m4a", "flac"])
 ground_truth = st.text_area("✍️ Paste ground truth (optional)", placeholder="e.g., move forward by 5 meters")
