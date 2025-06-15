@@ -6,6 +6,30 @@ import os
 import tempfile
 import re
 st.set_page_config(page_title="DSST Web App", layout="centered")
+st.markdown("""
+    <style>
+    .main {
+        padding: 30px;
+        font-family: 'Segoe UI', sans-serif;
+        color: #222;
+    }
+    h1 {
+        color: #356df3;
+        text-align: center;
+    }
+    .stTextArea, .stFileUploader, .stButton {
+        margin-top: 15px;
+    }
+    .stTextArea textarea {
+        font-size: 16px;
+    }
+    .stCode {
+        background-color: #f3f3f3;
+        padding: 12px;
+        border-radius: 10px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 @st.cache_resource
 def load_model():
@@ -61,33 +85,37 @@ def transcribe_audio(audio_path):
     return result.text.strip()
 
 # --- Streamlit UI ---
-st.title("DSST - Domain-Specific Speech Transcription")
+st.title("🧠 DSST - Domain Specific Speech Transcription")
 
-uploaded_audio = st.file_uploader("🎤 Upload an audio file", type=["wav", "mp3", "m4a", "flac"])
-ground_truth = st.text_area("✍️ Paste ground truth (optional)", placeholder="e.g., move forward by 5 meters")
+col1, col2 = st.columns([2, 3])
+
+with col1:
+    uploaded_audio = st.file_uploader("🎤 Upload Audio File", type=["wav", "mp3", "m4a", "flac"])
+
+with col2:
+    ground_truth = st.text_area("📝 Paste Ground Truth (Optional)", height=120)
 
 if uploaded_audio:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp.write(uploaded_audio.read())
-        tmp_path = tmp.name
+    with st.spinner("🔍 Transcribing..."):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            tmp.write(uploaded_audio.read())
+            tmp_path = tmp.name
+        transcription = transcribe_audio(tmp_path)
+        os.remove(tmp_path)
 
-    st.info("Transcribing...")
-    transcription = transcribe_audio(tmp_path)
-    st.success("✅ Transcription completed.")
-
-    st.markdown("### 📜 Transcribed Text")
+    st.subheader("📄 Transcription")
     st.code(transcription)
 
     if ground_truth:
         cer = calculate_cer(transcription, ground_truth)
-        st.metric(label="📉 Character Error Rate (CER)", value=f"{cer:.4f}")
+        st.metric(label="📉 Character Error Rate", value=f"{cer:.4f}")
 
     tokens = preprocess_text(transcription)
     if is_move_intent(tokens):
         commands = extract_commands(tokens)
-        st.markdown("### 🤖 Extracted Robot Commands")
+        st.subheader("🤖 Extracted Robot Commands")
         st.json(commands)
     else:
-        st.warning("No movement intent detected.")
+        st.warning("⚠️ No movement intent detected.")
 
     os.remove(tmp_path)
