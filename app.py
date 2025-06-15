@@ -134,4 +134,4 @@ with tab3:
     st.header("App Settings")
     st.write("Model used: `base` (OpenAI Whisper)")
     st.write("Built with 💙 using Streamlit.")
-    st.caption("For more, contact: arrushtandon@gmail.com")
+    st.caption("For more, contact: arrush6674@gmail.com")
