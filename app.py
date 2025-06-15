@@ -5,46 +5,37 @@ import Levenshtein
 import os
 import tempfile
 import re
+
 st.set_page_config(page_title="DSST Web App", layout="centered")
+
+# 🌐 Custom Style
 st.markdown("""
     <style>
-    .main {
-        padding: 30px;
-        font-family: 'Segoe UI', sans-serif;
-        color: #222;
-    }
-    h1 {
+    h1, h2, h3 {
         color: #356df3;
-        text-align: center;
     }
-    .stTextArea, .stFileUploader, .stButton {
-        margin-top: 15px;
-    }
-    .stTextArea textarea {
-        font-size: 16px;
-    }
-    .stCode {
-        background-color: #f3f3f3;
-        padding: 12px;
-        border-radius: 10px;
+    .main {
+        padding: 20px;
+        font-family: 'Segoe UI', sans-serif;
     }
     </style>
 """, unsafe_allow_html=True)
 
+# 📦 Load Whisper once
 @st.cache_resource
 def load_model():
     return whisper.load_model("base")
 
 model = load_model()
 
+# 🔧 Helper Functions
 def preprocess_text(text):
     text = text.lower()
     text = re.sub(r'[^\w\s]', '', text)
     return text.split()
 
 def is_move_intent(tokens):
-    keywords = ['move', 'go', 'forward', 'ascend', 'up', 'advance', 'fly', 'down', 'descend']
-    return any(token in keywords for token in tokens)
+    return any(token in tokens for token in ['move', 'go', 'forward', 'ascend', 'up', 'advance', 'fly', 'down', 'descend'])
 
 def extract_commands(tokens):
     actions = []
@@ -84,36 +75,63 @@ def transcribe_audio(audio_path):
     result = whisper.decode(model, mel, whisper.DecodingOptions(fp16=False))
     return result.text.strip()
 
-# --- Streamlit UI ---
-st.title("🧠 DSST - Domain Specific Speech Transcription")
+# -------------------- UI Layout --------------------
 
-col1, col2 = st.columns([2, 3])
+st.title("🧠 DSST - Domain-Specific Speech Transcription")
 
-with col1:
-    uploaded_audio = st.file_uploader("🎤 Upload Audio File", type=["wav", "mp3", "m4a", "flac"])
+tab1, tab2, tab3 = st.tabs(["🏠 Welcome", "📤 Upload & Transcribe", "⚙️ Settings"])
 
-with col2:
-    ground_truth = st.text_area("📝 Paste Ground Truth (Optional)", height=120)
+# ---------- 🏠 Welcome ----------
+with tab1:
+    st.header("Welcome to the DSST Web App")
+    st.write("""
+    This tool allows you to:
+    - 🎙 Upload an audio command (e.g. "move forward by 3 meters")
+    - 📜 Automatically transcribe it using OpenAI's Whisper
+    - 🧠 Extract robot movement instructions from natural speech
+    - 📉 (Optional) Compare with ground truth and calculate CER
 
-if uploaded_audio:
-    with st.spinner("🔍 Transcribing..."):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            tmp.write(uploaded_audio.read())
-            tmp_path = tmp.name
-        transcription = transcribe_audio(tmp_path)
-        os.remove(tmp_path)
+    Built by **Arrush Tandon** using Python, Whisper, Streamlit, and 💡 a passion for innovation.
+    """)
+    st.info("Head to the **Upload & Transcribe** tab to get started!")
 
-    st.subheader("📄 Transcription")
-    st.code(transcription)
+# ---------- 📤 Upload & Transcribe ----------
+with tab2:
+    col1, col2 = st.columns([2, 3])
+    with col1:
+        uploaded_audio = st.file_uploader("🎧 Upload Audio", type=["wav", "mp3", "m4a", "flac"])
+    with col2:
+        ground_truth = st.text_area("✍ Paste Ground Truth (Optional)", height=120)
 
-    if ground_truth:
-        cer = calculate_cer(transcription, ground_truth)
-        st.metric(label="📉 Character Error Rate", value=f"{cer:.4f}")
+    if uploaded_audio:
+        with st.spinner("Transcribing..."):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                tmp.write(uploaded_audio.read())
+                tmp_path = tmp.name
+            transcription = transcribe_audio(tmp_path)
+            try:
+                os.remove(tmp_path)
+            except Exception as e:
+                st.warning(f"Could not delete temp file: {e}")
 
-    tokens = preprocess_text(transcription)
-    if is_move_intent(tokens):
-        commands = extract_commands(tokens)
-        st.subheader("🤖 Extracted Robot Commands")
-        st.json(commands)
-    else:
-        st.warning("⚠️ No movement intent detected.")
+        st.subheader("📜 Transcription")
+        st.code(transcription)
+
+        if ground_truth:
+            cer = calculate_cer(transcription, ground_truth)
+            st.metric("CER (Character Error Rate)", f"{cer:.4f}")
+
+        tokens = preprocess_text(transcription)
+        if is_move_intent(tokens):
+            commands = extract_commands(tokens)
+            st.subheader("🤖 Extracted Robot Commands")
+            st.json(commands)
+        else:
+            st.warning("No movement intent detected.")
+
+# ---------- ⚙️ Settings ----------
+with tab3:
+    st.header("App Settings")
+    st.write("Model used: `base` (OpenAI Whisper)")
+    st.write("Built with 💙 using Streamlit.")
+    st.caption("For more, contact: arrushtandon@gmail.com")
