@@ -1,10 +1,11 @@
 import streamlit as st
-import whisper
 import librosa
-import Levenshtein
 import os
 import tempfile
-import re
+from core.robot_parser import is_robot_intent, extract_commands
+from core.preprocessing import normalize
+from core.asr import transcribe
+from core.metrics import cer
 
 st.set_page_config(page_title="DSST Web App", layout="centered")
 
@@ -20,60 +21,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-# 📦 Load Whisper once
-@st.cache_resource
-def load_model():
-    return whisper.load_model("base")
-
-model = load_model()
-
-# 🔧 Helper Functions
-def preprocess_text(text):
-    text = text.lower()
-    text = re.sub(r'[^\w\s]', '', text)
-    return text.split()
-
-def is_move_intent(tokens):
-    return any(token in tokens for token in ['move', 'go', 'forward', 'ascend', 'up', 'advance', 'fly', 'down', 'descend'])
-
-def extract_commands(tokens):
-    actions = []
-    i = 0
-    while i < len(tokens):
-        if tokens[i] in ['move', 'go', 'advance', 'fly', 'ascend', 'descend']:
-            action = {'action': tokens[i]}
-            if i+1 < len(tokens) and tokens[i+1] in ['up', 'forward', 'backward', 'down']:
-                action['direction'] = tokens[i+1]
-                i += 2
-            else:
-                action['direction'] = None
-                i += 1
-            if i < len(tokens) and tokens[i] == 'by':
-                if i+2 < len(tokens) and tokens[i+1].isdigit():
-                    action['distance'] = int(tokens[i+1])
-                    i += 3
-                else:
-                    action['distance'] = None
-                    i += 1
-            else:
-                action['distance'] = None
-            actions.append(action)
-        else:
-            i += 1
-    return actions
-
-def calculate_cer(predicted, reference):
-    if not reference.strip():
-        return None
-    return Levenshtein.distance(predicted.lower(), reference.lower()) / len(reference)
-
-def transcribe_audio(audio_path):
-    audio, sr = librosa.load(audio_path, sr=None)
-    audio = whisper.pad_or_trim(audio)
-    mel = whisper.log_mel_spectrogram(audio).to(model.device)
-    result = whisper.decode(model, mel, whisper.DecodingOptions(fp16=False))
-    return result.text.strip()
 
 # -------------------- UI Layout --------------------
 
@@ -97,37 +44,73 @@ with tab1:
 
 # ---------- 📤 Upload & Transcribe ----------
 with tab2:
+    robot_mode = st.toggle(
+        "🤖 Robot Command Mode",
+        value=False,
+        help="Turn ON for robot movement commands. Keep OFF for normal speech."
+    )
+
     col1, col2 = st.columns([2, 3])
     with col1:
-        uploaded_audio = st.file_uploader("🎧 Upload Audio", type=["wav", "mp3", "m4a", "flac"])
+        uploaded_audio = st.file_uploader(
+            "🎧 Upload Audio",
+            type=["wav", "mp3", "m4a", "flac"]
+        )
     with col2:
-        ground_truth = st.text_area("✍ Paste Ground Truth (Optional)", height=120)
+        ground_truth = st.text_area(
+            "✍ Paste Ground Truth (Optional)",
+            height=120
+        )
 
     if uploaded_audio:
         with st.spinner("Transcribing..."):
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                 tmp.write(uploaded_audio.read())
                 tmp_path = tmp.name
-            transcription = transcribe_audio(tmp_path)
+
+            transcription, segments = transcribe(tmp_path)
+
             try:
                 os.remove(tmp_path)
             except Exception as e:
                 st.warning(f"Could not delete temp file: {e}")
 
+        # ---------- Transcription ----------
         st.subheader("📜 Transcription")
         st.code(transcription)
 
+        # ---------- CER ----------
         if ground_truth:
-            cer = calculate_cer(transcription, ground_truth)
-            st.metric("CER (Character Error Rate)", f"{cer:.4f}")
+            cer_score = cer(transcription, ground_truth)
+            if cer_score is not None:
+                st.metric(
+                    "CER (Character Error Rate)",
+                    f"{cer_score:.4f}"
+                )
 
-        tokens = preprocess_text(transcription)
-        if is_move_intent(tokens):
-            commands = extract_commands(tokens)
-            st.subheader("🤖 Extracted Robot Commands")
-            st.json(commands)
-        else:
-            st.warning("No movement intent detected.")
+        # ---------- Robot Command Parsing (STRICTLY OPTIONAL) ----------
+        if robot_mode:
+            segmented_commands = []
+
+            for seg in segments:
+                seg_text = seg["text"]
+                tokens = normalize(seg_text)
+
+                if is_robot_intent(tokens):
+                    cmds = extract_commands(tokens)
+                    for c in cmds:
+                        c["start_time"] = round(seg["start"], 2)
+                        c["end_time"] = round(seg["end"], 2)
+                        c["source_text"] = seg_text
+                        segmented_commands.append(c)
+
+            if segmented_commands:
+                st.subheader("🤖 Segmented Robot Commands")
+                st.json(segmented_commands)
+            else:
+                st.warning(
+                    "Robot mode is ON, but no valid robot commands were detected."
+                )
 
 # ---------- ⚙️ Settings ----------
 with tab3:
