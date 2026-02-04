@@ -2,4 +2,7 @@ streamlit
 openai-whisper
 torch
 librosa
+soundfile
+ffmpeg-python
 python-Levenshtein
+numpy
