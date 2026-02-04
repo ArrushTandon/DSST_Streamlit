@@ -1,8 +1,19 @@
+# Core web
 streamlit
+
+# ML / ASR
 openai-whisper
 torch
+
+# Audio
 librosa
 soundfile
 ffmpeg-python
+
+# NLP / metrics
 python-Levenshtein
 numpy
+
+# Stability for Py 3.12
+numba>=0.59
+llvmlite>=0.42
