@@ -112,4 +112,9 @@ with tab2:
                     "Robot mode is ON, but no valid robot commands were detected."
                 )
 
-
+# ---------- ⚙️ Settings ----------
+with tab3:
+    st.header("App Settings")
+    st.write("Model used: `base` (OpenAI Whisper)")
+    st.write("Built with 💙 using Streamlit.")
+    st.caption("For more, contact: arrush6674@gmail.com")
